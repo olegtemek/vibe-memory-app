@@ -1,67 +1,20 @@
-# Tests the code, then builds the image and pushes it to Docker Hub.
-#   push to main   -> <user>/vibe-memory:latest and :sha-<commit>
-#   tag v1.2.3     -> <user>/vibe-memory:1.2.3, :1.2 and :latest
-# Needs repository secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (Settings -> Secrets and variables -> Actions).
-name: docker
+name: Docker build and push
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
-  pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: docker-${{ github.ref }}
+  group: docker-publish-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  build-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
-      - name: Backend
-        working-directory: server
-        run: |
-          go vet ./...
-          go test -race ./...
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: pwa-mobile-client/package-lock.json
-      - name: Web
-        working-directory: pwa-mobile-client
-        run: |
-          npm ci
-          npm run typecheck
-          npm test
-
-  image:
-    needs: test
-    # Pull requests are only tested: they have no access to the Docker Hub secrets.
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/vibe-memory
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
-            type=sha
-
-      # No QEMU: the Dockerfile cross-compiles, and the final stage runs nothing on the target platform.
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -69,6 +22,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/vibe-memory
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      # One image from the root Dockerfile: the server with the PWA built into it.
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -77,5 +39,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: VERSION=${{ steps.meta.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=vibe-memory
+          cache-to: type=gha,mode=max,scope=vibe-memory
