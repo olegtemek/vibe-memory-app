@@ -32,9 +32,8 @@ function goBack() {
   align-items: center;
   height: calc(var(--header-h) + var(--safe-top));
   padding: var(--safe-top) calc(8px + var(--safe-right)) 0 calc(8px + var(--safe-left));
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* Solid: a translucent blurred bar made the content scrolling under it look darkened. */
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 .title {
