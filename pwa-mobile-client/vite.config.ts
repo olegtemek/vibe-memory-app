@@ -1,11 +1,21 @@
 /// <reference types="vitest/config" />
 import { fileURLToPath, URL } from 'node:url'
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
+
+// Icon URLs carry a hash of the icons: iOS and the service worker cache icons by URL, so a redrawn
+// icon under the same name would keep showing the old one. index.html reads it as %VITE_ICON_VERSION%.
+const iconHash = createHash('sha256')
+for (const name of ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'favicon.png'])
+  iconHash.update(readFileSync(new URL(`./public/icons/${name}`, import.meta.url)))
+const iconVersion = iconHash.digest('hex').slice(0, 8)
+process.env.VITE_ICON_VERSION = iconVersion
+const icon = (name: string) => `/icons/${name}?v=${iconVersion}`
 
 // HTTPS for testing the camera on a phone (HTTPS=1, see the dev:https / preview:https scripts).
 // Requires certs/cert.pem + certs/key.pem (e.g. from mkcert, trusted on the device).
@@ -43,9 +53,9 @@ export default defineConfig({
         theme_color: '#1c1c1e',
         background_color: '#1c1c1e',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: icon('icon-192.png'), sizes: '192x192', type: 'image/png' },
+          { src: icon('icon-512.png'), sizes: '512x512', type: 'image/png' },
+          { src: icon('icon-512.png'), sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
