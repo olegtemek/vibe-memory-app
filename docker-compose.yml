@@ -1,0 +1,13 @@
+services:
+  vibe-memory:
+    build: .
+    image: vibe-memory
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Database and all photos, in ./data next to this file. Include it in backups.
+      - ./data:/data
+    environment:
+      MIN_FREE_MB: 500
+      LOG_LEVEL: info

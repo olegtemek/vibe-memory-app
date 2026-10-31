@@ -1,0 +1,14 @@
+**/.DS_Store
+**/node_modules
+pwa-mobile-client/dist
+pwa-mobile-client/dev-dist
+pwa-mobile-client/certs
+**/*.pem
+.env
+server/.env
+.run
+server/data
+server/bin
+server/internal/web/dist/*
+!server/internal/web/dist/.gitkeep
+data

@@ -1,0 +1,5 @@
+.env
+/data/
+/bin/
+/internal/web/dist/*
+!/internal/web/dist/.gitkeep
