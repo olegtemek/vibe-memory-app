@@ -48,6 +48,7 @@ export default defineConfig({
         description: 'Офлайн фотодневник',
         lang: 'ru',
         display: 'standalone',
+        id: '/vibe-memory',
         start_url: '/',
         scope: '/',
         theme_color: '#1c1c1e',
