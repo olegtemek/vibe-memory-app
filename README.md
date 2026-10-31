@@ -50,3 +50,5 @@ docker compose exec app /vibe-memory user add anna
 ```sh
 docker compose exec app /vibe-memory user list
 ```
+
+1eedb1b9-fb05-423a-9f66-d2310ab9645f

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ref } from 'vue'
 import { freshRepo, makeDraft } from './helpers'
 
 describe('repository', () => {
@@ -133,5 +134,15 @@ describe('repository.onServerStatus', () => {
     await repo.setServerStatus(entry.id, 2, 'complete')
     expect([status, changes]).toEqual([2, 1])
     expect((await repo.getEntry(entry.id))?.serverStatus).toBe('complete')
+  })
+})
+
+describe('repository.createEntry with a Vue draft', () => {
+  it('stores an entry whose draft came from a deep ref', async () => {
+    const { repo } = freshRepo()
+    // Views keep the draft in a ref: nested objects such as location become reactive proxies.
+    const draft = ref(await makeDraft('geo', { location: { lat: 43.25, lon: 76.95, accuracy: 12 } }))
+    const entry = await repo.createEntry({ ...draft.value, comment: 'x' })
+    expect((await repo.getEntry(entry.id))?.location).toEqual({ lat: 43.25, lon: 76.95, accuracy: 12 })
   })
 })

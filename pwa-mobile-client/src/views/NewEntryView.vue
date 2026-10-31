@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { repository } from '@/storage/repository'
 import { COMMENT_MAX_LENGTH, type Draft, type DraftFilter } from '@/storage/types'
@@ -21,7 +21,8 @@ import { reportError } from '@/utils/errors'
 
 const router = useRouter()
 const ui = useUiStore()
-const draft = ref<Draft | null>(null)
+// Shallow: the draft is replaced, never edited in place, and its parts go to IndexedDB as they are.
+const draft = shallowRef<Draft | null>(null)
 const previewUrl = ref<string>()
 const comment = ref('')
 const saving = ref(false)

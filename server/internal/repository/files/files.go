@@ -25,6 +25,11 @@ func New(root string) (*Store, error) {
 	s := &Store{root: root}
 	for _, dir := range []string{root, s.blobsDir(), s.tmpDir()} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
+			if errors.Is(err, fs.ErrPermission) {
+				// The usual cause in Docker: the mounted host directory belongs to another user.
+				return nil, fmt.Errorf("create %s: %w (the data directory must be writable by uid %d, gid %d)",
+					dir, err, os.Getuid(), os.Getgid())
+			}
 			return nil, fmt.Errorf("create %s: %w", dir, err)
 		}
 	}

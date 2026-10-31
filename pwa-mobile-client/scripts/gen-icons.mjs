@@ -1,10 +1,11 @@
 // Generates the PWA icons as plain PNGs without external tools.
-// Design: dark background, light "lens" ring with a dot in the middle.
+// Design: dark background, red "lens" ring with a dot in the middle.
 import { deflateSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
 
 const BG = [28, 28, 30]
-const FG = [255, 204, 0]
+// The app accent, --accent in main.css.
+const FG = [255, 59, 48]
 
 const crcTable = new Uint32Array(256).map((_, n) => {
   let c = n

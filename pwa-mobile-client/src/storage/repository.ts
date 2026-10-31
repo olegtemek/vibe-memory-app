@@ -57,6 +57,9 @@ function localHashes(e: Entry): string[] {
   return hashes
 }
 const clampComment = (text: string) => text.slice(0, COMMENT_MAX_LENGTH)
+/** A plain copy: IndexedDB cannot store the reactive proxies a draft held in a Vue ref carries. */
+const plainLocation = (p: GeoPoint | null | undefined): GeoPoint | null =>
+  p ? { lat: p.lat, lon: p.lon, accuracy: p.accuracy } : null
 
 export function createRepository(db: VibeMemoryDB = defaultDb) {
   // Notified after any change to entries, e.g. to schedule an upload.
@@ -130,7 +133,7 @@ export function createRepository(db: VibeMemoryDB = defaultDb) {
 
     async updateDraftLocation(location: GeoPoint): Promise<void> {
       await db.meta.where('key').equals('draft').modify((row) => {
-        ;(row.value as Draft).location = location
+        ;(row.value as Draft).location = plainLocation(location)
       })
     },
 
@@ -159,7 +162,7 @@ export function createRepository(db: VibeMemoryDB = defaultDb) {
         thumbHash: draft.thumbHash,
         width: draft.width,
         height: draft.height,
-        location: draft.location ?? null,
+        location: plainLocation(draft.location),
         createdAt: now,
         updatedAt: now,
         deleted: false,
