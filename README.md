@@ -1,10 +1,6 @@
 # vibe-memory
 
-PWA для iPhone (`pwa-mobile-client/`) и домашний сервер на Go (`server/`). Docker-образ один: сервер сам раздаёт
-приложение и API с одного адреса. Поэтому CORS не нужен, и в настройках приложения адрес сервера уже
-подставлен.
-
-Подробности по частям: [web/README.md](web/README.md) и [backend/README.md](backend/README.md).
+PWA приложение, которое позволяет делать фото и возвращаться к ним
 
 ## Команды
 
@@ -19,20 +15,6 @@ make down                # остановить то, что запустил up
 make user-add NAME=anna  # добавить пользователя, печатает токен
 ```
 
-Значение из командной строки важнее `.env`, например `make backend VIBE_MEMORY_SERVER_PORT=9000`.
-Список пользователей: `cd server && go run ./cmd/api user list`.
-
-Запуск в Docker рядом с кодом: база и фото попадут в `./data`, рядом с `Dockerfile`.
-
-```sh
-mkdir -p data && sudo chown 10001:10001 data   # только на Linux: процесс в контейнере работает от uid 10001
-docker compose up -d --build     # порт, каталог данных и uid настраиваются в .env (VIBE_MEMORY_*)
-docker compose exec app /vibe-memory user add anna
-```
-
-Переменные окружения описаны в [backend/README.md](backend/README.md#конфигурация).
-`VIBE_MEMORY_SERVER_CORS_ORIGINS` по умолчанию `*`: в API можно ходить с любого origin, доступ всё равно только по токену.
-
 ## Пользователи и токены
 
 У каждого человека свой аккаунт и свой токен. Фото разных аккаунтов не смешиваются.
@@ -42,7 +24,7 @@ docker compose exec app /vibe-memory user add anna
 
 ```sh
 docker compose exec app /vibe-memory user add anna
-# 3f0c2b1e-8a4d-4c6b-9f1e-2d7a5b9c0e14   <- токен
+# 1eedb1b9-fb05-423a-9f66-d2310ab9645f   <- токен
 ```
 
 Список пользователей с токенами, если кто-то потерял свой:
@@ -51,4 +33,3 @@ docker compose exec app /vibe-memory user add anna
 docker compose exec app /vibe-memory user list
 ```
 
-1eedb1b9-fb05-423a-9f66-d2310ab9645f
