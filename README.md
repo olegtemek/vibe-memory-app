@@ -9,17 +9,17 @@ PWA для iPhone (`pwa-mobile-client/`) и домашний сервер на G
 ## Команды
 
 Все команды запускаются из корня репозитория. Настройки лежат в `.env` в корне, он создаётся из `.env.example`
-при первом запуске. Относительный `DATA_DIR` считается от `server/`: по умолчанию данные лежат в `server/data`.
+при первом запуске. Относительный `VIBE_MEMORY_APP_DATA_DIR` считается от `server/`: по умолчанию данные лежат в `server/data`.
 
 ```sh
-make backend             # бэк на :8080, на переднем плане
+make backend             # бэк (API) на :8000, на переднем плане
 make web                 # фронт на :5173, на переднем плане
 make up                  # бэк и фронт в фоне, логи в .run/backend.log и .run/web.log
 make down                # остановить то, что запустил up
 make user-add NAME=anna  # добавить пользователя, печатает токен
 ```
 
-Значение из командной строки важнее `.env`, например `make backend ADDR=:9000`.
+Значение из командной строки важнее `.env`, например `make backend VIBE_MEMORY_SERVER_PORT=9000`.
 Список пользователей: `cd server && go run ./cmd/api user list`.
 
 Запуск в Docker рядом с кодом: база и фото попадут в `./data`, рядом с `Dockerfile`.
@@ -31,7 +31,7 @@ docker compose exec app /vibe-memory user add anna
 ```
 
 Переменные окружения описаны в [backend/README.md](backend/README.md#конфигурация).
-`ALLOWED_ORIGINS` в образе пустая: приложение и API работают с одного адреса.
+`VIBE_MEMORY_SERVER_CORS_ORIGINS` по умолчанию `*`: в API можно ходить с любого origin, доступ всё равно только по токену.
 
 ## Пользователи и токены
 

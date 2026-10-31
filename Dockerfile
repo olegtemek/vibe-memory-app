@@ -32,13 +32,16 @@ COPY --from=server /out/vibe-memory /vibe-memory
 # (10001 by default): sudo chown 10001:10001 data
 COPY --from=server --chown=10001:10001 /out/app /app
 WORKDIR /app
-ENV ADDR=:8080 \
-    DATA_DIR=/app/data \
-    ALLOWED_ORIGINS= \
-    MIN_FREE_MB=500 \
-    LOG_LEVEL=info
-EXPOSE 8080
+# 8000: API only. 8080: PWA with the API on the same origin.
+ENV VIBE_MEMORY_SERVER_PORT=8000 \
+    VIBE_MEMORY_WEB_PORT=8080 \
+    VIBE_MEMORY_SERVER_CORS_ORIGINS=* \
+    VIBE_MEMORY_APP_DATA_DIR=/app/data \
+    VIBE_MEMORY_APP_MIN_FREE_MB=500 \
+    VIBE_MEMORY_APP_LOG_LEVEL=info
+EXPOSE 8000 8080
 USER 10001:10001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -fsS -o /dev/null http://127.0.0.1:8080/health || exit 1
+    CMD curl -fsS -o /dev/null "http://127.0.0.1:${VIBE_MEMORY_SERVER_PORT}/health" \
+     && { [ "$VIBE_MEMORY_WEB_PORT" = 0 ] || curl -fsS -o /dev/null "http://127.0.0.1:${VIBE_MEMORY_WEB_PORT}/"; } || exit 1
 ENTRYPOINT ["/vibe-memory"]

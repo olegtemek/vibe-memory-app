@@ -3,21 +3,22 @@ name: vibe-memory
 services:
   app:
     build: .
-    image: vibe-memory
     env_file: .env
     environment:
-      # Fixed inside the container whatever .env says for running without Docker.
-      ADDR: ":8080"
-      DATA_DIR: /app/data
+      # In .env the data directory is for running without Docker; in the container it is the volume.
+      VIBE_MEMORY_APP_DATA_DIR: /app/data
     working_dir: /app
     user: "${VIBE_MEMORY_DOCKER_USER:-10001:10001}"
     volumes:
       # Database and all photos. Include this directory in backups.
       - ${VIBE_MEMORY_DATA_DIR:-./data}:/app/data
     ports:
-      - "${VIBE_MEMORY_BIND_ADDRESS:-127.0.0.1}:${VIBE_MEMORY_PORT:-8080}:8080"
+      - "${VIBE_MEMORY_BIND_ADDRESS:-127.0.0.1}:${VIBE_MEMORY_SERVER_PORT:-8000}:${VIBE_MEMORY_SERVER_PORT:-8000}"
+      - "${VIBE_MEMORY_BIND_ADDRESS:-127.0.0.1}:${VIBE_MEMORY_WEB_PORT:-8080}:${VIBE_MEMORY_WEB_PORT:-8080}"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/health"]
+      test:
+        - CMD-SHELL
+        - curl -fsS -o /dev/null "http://127.0.0.1:${VIBE_MEMORY_SERVER_PORT:-8000}/health" && curl -fsS -o /dev/null "http://127.0.0.1:${VIBE_MEMORY_WEB_PORT:-8080}/" || exit 1
       interval: 30s
       timeout: 5s
       start_period: 5s

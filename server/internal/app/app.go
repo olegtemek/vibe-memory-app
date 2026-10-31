@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"sync"
 
 	"vibe-memory/internal/config"
 	"vibe-memory/internal/handler"
@@ -20,12 +21,17 @@ import (
 
 // App is the assembled server. Create it with New, start it with Run, stop it with Shutdown.
 type App struct {
-	server *http.Server
-	db     *db.DB
+	servers []namedServer
+	db      *db.DB
 }
 
-// New prepares the data directory, opens and migrates the database and builds the HTTP server.
-// Nothing listens yet.
+type namedServer struct {
+	name string
+	*http.Server
+}
+
+// New prepares the data directory, opens and migrates the database and builds the HTTP servers:
+// the API on VIBE_MEMORY_SERVER_PORT and, when the PWA is built in, the PWA with the API on VIBE_MEMORY_WEB_PORT. Nothing listens yet.
 func New(ctx context.Context, cfg config.Config, version string) (*App, error) {
 	fileStore, err := files.New(cfg.DataDir)
 	if err != nil {
@@ -37,23 +43,47 @@ func New(ctx context.Context, cfg config.Config, version string) (*App, error) {
 	}
 
 	svc := usecase.New(database, fileStore, usecase.Options{MinFreeBytes: uint64(cfg.MinFreeMB) << 20})
-	static := web.Handler()
-	h := handler.New(svc, handler.Options{AllowedOrigins: cfg.AllowedOrigins, Version: version, Static: static})
-	slog.Info("starting", "version", version, "data_dir", cfg.DataDir, "allowed_origins", cfg.AllowedOrigins,
-		"pwa", static != nil)
+	opts := handler.Options{AllowedOrigins: cfg.AllowedOrigins, Version: version}
+	a := &App{db: database}
+	a.servers = append(a.servers, namedServer{"api", handler.NewServer(cfg.Addr(), handler.New(svc, opts))})
 
-	return &App{server: handler.NewServer(cfg.Addr, h), db: database}, nil
+	static := web.Handler()
+	switch {
+	case cfg.WebAddr() == "":
+	case static == nil:
+		slog.Warn("PWA is not built in, VIBE_MEMORY_WEB_PORT is ignored", "web_port", cfg.WebPort)
+	default:
+		// The PWA calls the API on its own origin, so it needs no CORS and no address typed in.
+		opts.Static = static
+		a.servers = append(a.servers, namedServer{"pwa+api", handler.NewServer(cfg.WebAddr(), handler.New(svc, opts))})
+	}
+	slog.Info("starting", "version", version, "data_dir", cfg.DataDir, "cors_origins", cfg.AllowedOrigins)
+	return a, nil
 }
 
-// Run listens and serves until Shutdown is called. It returns nil after a clean shutdown.
+// Run listens and serves until Shutdown is called. It returns nil after a clean shutdown
+// and the first error if any server fails.
 func (a *App) Run() error {
-	ln, err := net.Listen("tcp", a.server.Addr)
-	if err != nil {
-		return fmt.Errorf("listen %s: %w", a.server.Addr, err)
+	listeners := make([]net.Listener, 0, len(a.servers))
+	for _, s := range a.servers {
+		ln, err := net.Listen("tcp", s.Addr)
+		if err != nil {
+			for _, l := range listeners {
+				l.Close()
+			}
+			return fmt.Errorf("listen %s: %w", s.Addr, err)
+		}
+		listeners = append(listeners, ln)
 	}
-	slog.Info("server started", "addr", ln.Addr().String())
-	if err := a.server.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
-		return err
+	errs := make(chan error, len(a.servers))
+	for i, s := range a.servers {
+		slog.Info("server started", "serves", s.name, "addr", listeners[i].Addr().String())
+		go func() { errs <- s.Serve(listeners[i]) }()
+	}
+	for range a.servers {
+		if err := <-errs; !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
 	}
 	return nil
 }
@@ -61,11 +91,20 @@ func (a *App) Run() error {
 // Shutdown stops accepting connections, waits for active requests until ctx expires
 // and closes the database. Requests still running after the deadline are cut off.
 func (a *App) Shutdown(ctx context.Context) error {
-	err := a.server.Shutdown(ctx)
-	if err != nil {
-		a.server.Close()
-		err = fmt.Errorf("shutdown: %w", err)
+	errs := make([]error, len(a.servers))
+	var wg sync.WaitGroup
+	for i, s := range a.servers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.Shutdown(ctx); err != nil {
+				s.Close()
+				errs[i] = fmt.Errorf("shutdown %s: %w", s.name, err)
+			}
+		}()
 	}
+	wg.Wait()
+	err := errors.Join(errs...)
 	if cerr := a.db.Close(); cerr != nil {
 		err = errors.Join(err, fmt.Errorf("close database: %w", cerr))
 	}

@@ -20,7 +20,7 @@ const commandUsage = `usage:
   vibe-memory user add NAME    create an account and print its token
   vibe-memory user list        print all accounts with their tokens`
 
-// runCommand runs an admin command against the database in DATA_DIR and returns the exit code.
+// runCommand runs an admin command against the database in VIBE_MEMORY_APP_DATA_DIR and returns the exit code.
 // It is safe while the server is running: SQLite serializes the writes.
 func runCommand(cfg config.Config, args []string) int {
 	if len(args) < 2 || args[0] != "user" {
