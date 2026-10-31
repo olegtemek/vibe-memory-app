@@ -4,10 +4,15 @@ import DraftPrompt from '@/components/DraftPrompt.vue'
 import ConfirmHost from '@/components/ConfirmHost.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import { onMounted } from 'vue'
+import { repository } from '@/storage/repository'
 import { useSyncStore } from '@/stores/sync'
 
 const sync = useSyncStore()
-onMounted(() => sync.init().catch((e) => console.error(e)))
+onMounted(() => {
+  sync.init().catch((e) => console.error(e))
+  // Every launch: without it iOS may clear the photos not yet on the server when space runs low.
+  repository.ensurePersisted().catch(() => undefined)
+})
 </script>
 
 <template>

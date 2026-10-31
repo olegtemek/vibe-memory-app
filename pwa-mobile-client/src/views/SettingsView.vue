@@ -124,6 +124,21 @@ const phaseLabel: Record<SyncPhase, string> = {
   files: 'Загружаю файлы',
 }
 
+const persisting = ref(false)
+/** Asks again from a tap: Safari is more willing to grant persistence to a direct user action. */
+async function enablePersist() {
+  persisting.value = true
+  try {
+    const granted = await repository.ensurePersisted()
+    await refresh()
+    if (granted === false) ui.showToast('iOS не разрешила постоянное хранение', 'error')
+  } catch (e) {
+    reportError(e)
+  } finally {
+    persisting.value = false
+  }
+}
+
 const persistLabel = computed(() => {
   const p = usage.value?.persisted
   if (p === true) return 'Включено'
@@ -222,7 +237,18 @@ const parts = (n: number) => `${n} ${plural(n, ['часть', 'части', 'ч�
           <span v-if="usage.quota" class="muted">из {{ formatBytes(usage.quota) }}</span>
         </dd>
         <dt>Постоянное хранение</dt>
-        <dd>{{ persistLabel }}</dd>
+        <dd>
+          {{ persistLabel }}
+          <button
+            v-if="usage.persisted === false"
+            class="btn-link"
+            type="button"
+            :disabled="persisting"
+            @click="enablePersist"
+          >
+            Включить
+          </button>
+        </dd>
         <template v-if="usage.offloadedCount">
           <dt>Оригиналы только на сервере</dt>
           <dd>{{ usage.offloadedCount }}</dd>

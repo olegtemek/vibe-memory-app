@@ -105,96 +105,20 @@ function go(target: Entry | undefined) {
   router.replace(`/entry/${target.id}`)
 }
 
-// --- touch: swipe sideways between photos of the day, drag down to close ---
-/** Released lower than this, or flicked faster than DISMISS_SPEED, the drag closes the viewer. */
-const DISMISS_DISTANCE = 120
-/** px per ms over the whole drag. */
-const DISMISS_SPEED = 0.6
-const DISMISS_MS = 200
-
+// --- swipe between photos of the same day ---
 let touchX = 0
 let touchY = 0
-let touchT = 0
-/** Decided on the first move: `down` drags the viewer, `other` leaves the gesture to swipes and zoom. */
-let gesture: 'down' | 'other' | null = null
-const dragY = ref(0)
-const dragging = ref(false)
-
-/** Pinch-zoomed: a vertical drag pans the photo instead. */
-const zoomed = () => (window.visualViewport?.scale ?? 1) > 1.01
-
 function onTouchStart(ev: TouchEvent) {
   touchX = ev.touches[0]!.clientX
   touchY = ev.touches[0]!.clientY
-  touchT = ev.timeStamp
-  gesture = ev.touches.length === 1 && !editing.value && !zoomed() ? null : 'other'
 }
-
-function onTouchMove(ev: TouchEvent) {
-  if (gesture === 'other') return
-  if (ev.touches.length !== 1) {
-    // A second finger: this is a pinch, not a drag.
-    gesture = 'other'
-    dragging.value = false
-    dragY.value = 0
-    return
-  }
-  const dx = ev.touches[0]!.clientX - touchX
-  const dy = ev.touches[0]!.clientY - touchY
-  if (gesture === null) {
-    if (Math.hypot(dx, dy) < 10) return
-    gesture = dy > 0 && dy > Math.abs(dx) * 1.2 ? 'down' : 'other'
-    if (gesture === 'other') return
-    dragging.value = true
-  }
-  ev.preventDefault()
-  dragY.value = Math.max(0, dy)
-}
-
 function onTouchEnd(ev: TouchEvent) {
+  if (editing.value) return
   const dx = ev.changedTouches[0]!.clientX - touchX
   const dy = ev.changedTouches[0]!.clientY - touchY
-  if (gesture === 'down') {
-    gesture = null
-    dragging.value = false
-    const speed = dy / Math.max(1, ev.timeStamp - touchT)
-    if (dy > DISMISS_DISTANCE || speed > DISMISS_SPEED) dismiss()
-    else dragY.value = 0
-    return
-  }
-  gesture = null
-  if (editing.value) return
   if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
   go(dx < 0 ? next.value : prev.value)
 }
-
-function onTouchCancel() {
-  gesture = null
-  dragging.value = false
-  dragY.value = 0
-}
-
-let dismissTimer: ReturnType<typeof setTimeout> | undefined
-/** Lets the photo fall off the screen, then closes. */
-function dismiss() {
-  dragY.value = window.innerHeight
-  dismissTimer = setTimeout(close, DISMISS_MS)
-}
-onBeforeUnmount(() => clearTimeout(dismissTimer))
-
-/** 0 at rest, 1 when dragged half the screen down. */
-const dragProgress = computed(() => Math.min(dragY.value / (window.innerHeight / 2), 1))
-const stageStyle = computed(() =>
-  dragY.value || dragging.value
-    ? {
-        transform: `translateY(${dragY.value}px) scale(${1 - dragProgress.value * 0.25})`,
-        transition: dragging.value ? 'none' : `transform ${DISMISS_MS}ms ease-out`,
-      }
-    : undefined,
-)
-const chromeStyle = computed(() =>
-  dragY.value ? { opacity: 1 - dragProgress.value, transition: dragging.value ? 'none' : `opacity ${DISMISS_MS}ms` } : undefined,
-)
 function onKey(ev: KeyboardEvent) {
   if (editing.value) return
   if (ev.key === 'ArrowLeft') go(prev.value)
@@ -208,11 +132,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 // ends up under the keyboard. While editing, the viewer follows the visual viewport instead.
 // Only while editing, so pinch-zooming the photo does not resize the viewer.
 const viewport = ref<{ top: number; height: number } | null>(null)
-const viewerStyle = computed(() => ({
-  ...(viewport.value && { top: `${viewport.value.top}px`, height: `${viewport.value.height}px`, bottom: 'auto' }),
-  // The page behind shows through while the photo is dragged down.
-  ...(dragY.value && { background: `rgba(0, 0, 0, ${1 - dragProgress.value * 0.7})` }),
-}))
+const viewerStyle = computed(() =>
+  viewport.value ? { top: `${viewport.value.top}px`, height: `${viewport.value.height}px`, bottom: 'auto' } : undefined,
+)
 
 function syncViewport() {
   const vv = window.visualViewport
@@ -312,12 +234,7 @@ async function restore() {
   await load(entry.value.id)
 }
 
-let closed = false
 function close() {
-  // Once only: the ✕ button may be tapped while a drag-to-close is finishing.
-  if (closed) return
-  closed = true
-  clearTimeout(dismissTimer)
   if (window.history.state?.back) router.back()
   else router.replace(entry.value ? `/day/${entry.value.dayKey}` : '/')
 }
@@ -325,7 +242,7 @@ function close() {
 
 <template>
   <div class="viewer fade-in" :class="{ editing }" :style="viewerStyle">
-    <header class="top" :style="chromeStyle">
+    <header class="top">
       <button class="icon-btn" type="button" aria-label="Закрыть" @click="close">✕</button>
       <div v-if="entry" class="when">
         {{ formatDateTime(entry.takenAt, entry.tzOffsetMin) }}
@@ -334,14 +251,7 @@ function close() {
       <span class="icon-btn" />
     </header>
 
-    <div
-      class="stage"
-      :style="stageStyle"
-      @touchstart.passive="onTouchStart"
-      @touchmove="onTouchMove"
-      @touchend="onTouchEnd"
-      @touchcancel="onTouchCancel"
-    >
+    <div class="stage" @touchstart.passive="onTouchStart" @touchend="onTouchEnd">
       <img
         v-if="placeholderUrl"
         :key="placeholderUrl"
@@ -375,7 +285,7 @@ function close() {
       <button v-if="next && !editing" class="nav right" type="button" aria-label="Следующее" @click="go(next)">›</button>
     </div>
 
-    <footer v-if="entry" class="bottom" :style="chromeStyle">
+    <footer v-if="entry" class="bottom">
       <div v-if="entry.deleted" class="trash-note">
         Фото в корзине.
         <button class="btn-link" type="button" @click="restore">Восстановить</button>

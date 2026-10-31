@@ -446,14 +446,14 @@ export function createRepository(db: VibeMemoryDB = defaultDb) {
       return { usage, quota, entryCount, persisted, offloadedCount }
     },
 
-    /** Asks for persistent storage once, after the first saved photo. */
+    /**
+     * Asks for persistent storage unless the browser already granted it. The answer is never cached:
+     * iOS may revoke it, and Safari decides better when the call comes straight from a tap.
+     */
     async ensurePersisted(): Promise<boolean | undefined> {
-      const known = await getMeta<boolean>('persistGranted')
-      if (known === true) return true
       if (!navigator.storage?.persist) return undefined
-      const granted = await navigator.storage.persist()
-      await setMeta('persistGranted', granted)
-      return granted
+      if (await navigator.storage.persisted()) return true
+      return navigator.storage.persist()
     },
   }
 }

@@ -62,7 +62,6 @@ export interface MetaRow {
 
 export type MetaKey =
   | 'schemaVersion'
-  | 'persistGranted'
   | 'lastExportAt'
   | 'lastSeq'
   | 'draft'
