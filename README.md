@@ -25,9 +25,9 @@ make user-add NAME=anna  # добавить пользователя, печат
 Запуск в Docker рядом с кодом: база и фото попадут в `./data`, рядом с `Dockerfile`.
 
 ```sh
-mkdir -p data && sudo chown 65532:65532 data   # только на Linux: процесс в контейнере работает от uid 65532
-docker compose up -d --build
-docker compose exec vibe-memory /vibe-memory user add anna
+mkdir -p data && sudo chown 10001:10001 data   # только на Linux: процесс в контейнере работает от uid 10001
+docker compose up -d --build     # порт, каталог данных и uid настраиваются в .env (VIBE_MEMORY_*)
+docker compose exec app /vibe-memory user add anna
 ```
 
 Переменные окружения описаны в [backend/README.md](backend/README.md#конфигурация).
@@ -41,12 +41,12 @@ docker compose exec vibe-memory /vibe-memory user add anna
 Добавить пользователя (сервер может работать):
 
 ```sh
-docker compose exec vibe-memory /vibe-memory user add anna
+docker compose exec app /vibe-memory user add anna
 # 3f0c2b1e-8a4d-4c6b-9f1e-2d7a5b9c0e14   <- токен
 ```
 
 Список пользователей с токенами, если кто-то потерял свой:
 
 ```sh
-docker compose exec vibe-memory /vibe-memory user list
+docker compose exec app /vibe-memory user list
 ```

@@ -5,7 +5,6 @@ import type { BlobKind, Entry, ServerEntry, ServerSettings, ServerStatus } from 
  * HTTP client for the home server. The contract is described in pwa-mobile-client/SERVER_API.md.
  * All paths are relative to the configured base URL.
  */
-export const API_PREFIX = '/api/v1'
 const REQUEST_TIMEOUT_MS = 30_000
 const BLOB_TIMEOUT_MS = 120_000
 export const PAGE_SIZE = 100
@@ -105,7 +104,7 @@ export function isMixedContent(serverUrl: string, pageProtocol = globalThis.loca
 }
 
 export function createServerClient(settings: Pick<ServerSettings, 'url' | 'token'>, fetchImpl: FetchLike = fetch) {
-  const base = normalizeServerUrl(settings.url) + API_PREFIX
+  const base = normalizeServerUrl(settings.url)
   const authorization = `Bearer ${normalizeToken(settings.token)}`
 
   async function request(path: string, init: RequestInit = {}, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
@@ -151,10 +150,18 @@ export function createServerClient(settings: Pick<ServerSettings, 'url' | 'token
     })
 
   return {
+    /** Open endpoint: tells that the address is a vibe-memory server, not that the token is valid. */
     async health(): Promise<HealthInfo> {
       const data = await json<HealthInfo>(await request('/health'))
       if (!data || data.ok !== true) throw new ServerError('protocol', 'Сервер ответил, но это не vibe-memory')
       return data
+    },
+
+    /** Checks the address, then the token, with an endpoint that requires it. */
+    async checkConnection(): Promise<HealthInfo> {
+      const info = await this.health()
+      await this.state()
+      return info
     },
 
     /** Highest sequence number among this account's entries; 0 for an empty account. */

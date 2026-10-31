@@ -78,7 +78,7 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   async function testConnection(candidate: Pick<ServerSettings, 'url' | 'token'>): Promise<HealthInfo> {
-    return createServerClient(candidate).health()
+    return createServerClient(candidate).checkConnection()
   }
 
   /** Pulls changes, pushes pending entries and missing files. Returns null when nothing ran (already running or not configured). */

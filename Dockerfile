@@ -22,18 +22,23 @@ COPY server/ ./
 COPY --from=web /src/pwa-mobile-client/dist ./internal/web/dist
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o /out/vibe-memory ./cmd/api \
- && mkdir /out/data
+ && mkdir -p /out/app/data
 
-FROM gcr.io/distroless/static-debian12:nonroot
+# Alpine instead of distroless: the health check needs curl.
+FROM alpine:3.22
+RUN apk add --no-cache curl
 COPY --from=server /out/vibe-memory /vibe-memory
-# Mount the host directory here (docker-compose.yml uses ./data next to this file). On Linux it must be
-# writable by uid 65532: sudo chown 65532:65532 data
-COPY --from=server --chown=65532:65532 /out/data /data
+# docker-compose.yml mounts ./data here. The directory must be writable by the container user
+# (10001 by default): sudo chown 10001:10001 data
+COPY --from=server --chown=10001:10001 /out/app /app
+WORKDIR /app
 ENV ADDR=:8080 \
-    DATA_DIR=/data \
+    DATA_DIR=/app/data \
     ALLOWED_ORIGINS= \
     MIN_FREE_MB=500 \
     LOG_LEVEL=info
 EXPOSE 8080
-USER 65532:65532
+USER 10001:10001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -fsS -o /dev/null http://127.0.0.1:8080/health || exit 1
 ENTRYPOINT ["/vibe-memory"]

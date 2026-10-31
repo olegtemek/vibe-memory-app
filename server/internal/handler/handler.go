@@ -31,15 +31,22 @@ type Service interface {
 }
 
 const (
-	apiPrefix   = "/api/v1"
+	healthPath = "/health"
+	// galleryPath roots every other API route. The PWA has no routes under it.
+	galleryPath = "/gallery"
 	serviceName = "vibe-memory"
 )
+
+// isAPI tells API requests from PWA pages: everything else belongs to the app.
+func isAPI(path string) bool {
+	return path == healthPath || path == galleryPath || strings.HasPrefix(path, galleryPath+"/")
+}
 
 // Options configure the HTTP layer.
 type Options struct {
 	AllowedOrigins []string
 	Version        string
-	// Static serves the PWA on every path outside /api/, without authorization. Nil: API only.
+	// Static serves the PWA on every path that is not an API route, without authorization. Nil: API only.
 	Static http.Handler
 }
 
@@ -73,28 +80,26 @@ func New(svc Service, opts Options) http.Handler {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	})
 
-	r.Route(apiPrefix, func(r chi.Router) {
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequestSize(models.MaxJSONBody))
-			r.Get("/health", a.health)
-			r.Get("/gallery/state", a.state)
-			r.Post("/gallery", a.push)
-			r.Get("/gallery/partial", a.partial)
-			r.Get("/gallery/changes", a.changes)
-			r.Get("/gallery/{id}/{kind}", a.getFile)
-			r.Head("/gallery/{id}/{kind}", a.getFile)
-		})
-		// The upload limit is enforced by putFile itself.
-		r.Put("/gallery/{id}/{kind}", a.putFile)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.RequestSize(models.MaxJSONBody))
+		r.Get(healthPath, a.health)
+		r.Get("/gallery/state", a.state)
+		r.Post("/gallery", a.push)
+		r.Get("/gallery/partial", a.partial)
+		r.Get("/gallery/changes", a.changes)
+		r.Get("/gallery/{id}/{kind}", a.getFile)
+		r.Head("/gallery/{id}/{kind}", a.getFile)
 	})
+	// The upload limit is enforced by putFile itself.
+	r.Put("/gallery/{id}/{kind}", a.putFile)
 	return r
 }
 
-// serveStatic hands every request outside /api/ to the PWA, before CORS and authorization.
+// serveStatic hands every request that is not an API route to the PWA, before CORS and authorization.
 func serveStatic(static http.Handler) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/api" && !strings.HasPrefix(r.URL.Path, "/api/") {
+			if !isAPI(r.URL.Path) {
 				static.ServeHTTP(w, r)
 				return
 			}

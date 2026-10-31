@@ -1,13 +1,27 @@
+name: vibe-memory
+
 services:
-  vibe-memory:
+  app:
     build: .
     image: vibe-memory
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    volumes:
-      # Database and all photos, in ./data next to this file. Include it in backups.
-      - ./data:/data
+    env_file: .env
     environment:
-      MIN_FREE_MB: 500
-      LOG_LEVEL: info
+      # Fixed inside the container whatever .env says for running without Docker.
+      ADDR: ":8080"
+      DATA_DIR: /app/data
+    working_dir: /app
+    user: "${VIBE_MEMORY_DOCKER_USER:-10001:10001}"
+    volumes:
+      # Database and all photos. Include this directory in backups.
+      - ${VIBE_MEMORY_DATA_DIR:-./data}:/app/data
+    ports:
+      - "${VIBE_MEMORY_BIND_ADDRESS:-127.0.0.1}:${VIBE_MEMORY_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    # The server lets running uploads finish for up to 30 s after SIGTERM.
+    stop_grace_period: 35s
+    restart: unless-stopped

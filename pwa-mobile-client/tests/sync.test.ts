@@ -33,14 +33,15 @@ function fakeServer(opts: { token?: string; rejectIds?: Set<string>; failFiles?:
     const url = new URL(input)
     const method = init.method ?? 'GET'
     calls.push(`${method} ${url.pathname}`)
+    const json = (data: unknown) => Response.json(data)
+    // Open on the real server too.
+    if (url.pathname === '/health') return json({ ok: true, name: 'test' })
     const auth = new Headers(init.headers).get('Authorization')
     if (auth !== `Bearer ${token}`) return new Response('no', { status: 401 })
-    const json = (data: unknown) => Response.json(data)
     const after = Number(url.searchParams.get('after') ?? 0)
     const limit = Number(url.searchParams.get('limit') ?? 100)
-    const path = url.pathname.replace('/api/v1', '')
+    const path = url.pathname
 
-    if (path === '/health') return json({ ok: true, name: 'test' })
     if (path === '/gallery/state') return json({ lastSeq })
     if (path === '/gallery' && method === 'POST') {
       const body = JSON.parse(init.body as string) as { entries: ServerEntry[] }
@@ -120,8 +121,12 @@ describe('server client', () => {
 
   it('sends the token and maps 401 to an auth error', async () => {
     const server = fakeServer({ token: 'secret' })
-    await expect(createServerClient({ url: 'https://h', token: 'secret' }, server.fetchImpl).health()).resolves.toMatchObject({ ok: true })
-    await expect(createServerClient({ url: 'https://h', token: 'wrong' }, server.fetchImpl).health()).rejects.toMatchObject({ kind: 'auth' })
+    const good = createServerClient({ url: 'https://h', token: 'secret' }, server.fetchImpl)
+    const bad = createServerClient({ url: 'https://h', token: 'wrong' }, server.fetchImpl)
+    await expect(good.checkConnection()).resolves.toMatchObject({ ok: true })
+    // /health is open, so only the second request of the check catches a wrong token.
+    await expect(bad.health()).resolves.toMatchObject({ ok: true })
+    await expect(bad.checkConnection()).rejects.toMatchObject({ kind: 'auth' })
   })
   it('maps fetch failures to network errors', async () => {
     const client = createServerClient({ url: 'https://h', token: TOKEN }, async () => {
@@ -154,7 +159,7 @@ describe('syncAll: push', () => {
     // Nothing to send: only the feed and the partial list are read.
     server.calls.length = 0
     expect(await syncAll(repo, server.client())).toEqual({ pulled: 0, pushed: 0, files: 0, failed: 0, errors: [] })
-    expect(server.calls).toEqual(['GET /api/v1/gallery/changes', 'GET /api/v1/gallery/partial'])
+    expect(server.calls).toEqual(['GET /gallery/changes', 'GET /gallery/partial'])
   })
 
   it('re-sends only the changed entry and no files', async () => {

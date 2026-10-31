@@ -75,9 +75,14 @@ const authFailLimit = 20
 
 // authenticate resolves the bearer token to a user. Missing, malformed and unknown tokens
 // all get the same 401; an IP with too many 401s gets 429 until its window ends.
+// The health check is open, for Docker and monitoring.
 func authenticate(svc Service, limiter *authLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == healthPath {
+				next.ServeHTTP(w, r)
+				return
+			}
 			ip := clientIP(r)
 			if limiter.blocked(ip) {
 				writeError(w, http.StatusTooManyRequests, "too many failed authorization attempts")
